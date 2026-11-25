@@ -384,6 +384,8 @@ sequenceDiagram
   3. Mengombinasikan `PMK + ANonce + SNonce + MAC_AP + MAC_STA` untuk menghasilkan kandidat `PTK`.
   4. Menghitung nilai hash MIC pada Message 2 yang terekam di file `.cap` menggunakan sub-kunci KCK.
   5. Jika nilai MIC hasil kalkulasi cocok dengan nilai MIC asli di dalam paket capture, kata sandi target ditemukan (**KEY FOUND!**). Jika seluruh daftar kata sandi habis tanpa kecocokan, program melaporkan **KEY NOT FOUND**.
+* **Kesimpulan Hasil Eksekusi Tugas 4**:
+  Karena berkas `handshake-k6.cap` yang disediakan di repositori lab bukan merupakan capture 802.11 yang valid, `aircrack-ng` berhenti pada tahap pembacaan paket (`This file is not a regular 802.11 (wireless) capture. / Read 0 packets. / No networks found, exiting.`) dan tidak dapat mencapai tahap pencocokan kunci (`KEY FOUND` maupun `KEY NOT FOUND`).
 
 ---
 
@@ -630,6 +632,17 @@ Query mencurigakan (label panjang berisi hex):
 | 5 | Pertemuan 5 | Crafting Paket ICMP Scapy & Pembahasan Smurf Attack | **SELESAI (100%)** | `Tugas 5 - 1. ICMP Scapy Echo Reply.png` |
 | 6 | Pertemuan 6 | TCP SYN Flood DoS & Analisis Three-Way Handshake via `tcpdump` | **SELESAI (100%)** | `Tugas 6 - 1. TCP SYN Flood SYN_RECV.png`<br>`Tugas 6 - 2. Three-Way Handshake tcpdump.png` |
 | 7 | Pertemuan 7 | DNS Exfiltration Covert Channel & Deteksi Heuristik Log | **SELESAI (100%)** | `Tugas 7 - 1. DNS Exfiltration Query & Log dnsmasq.png`<br>`Tugas 7 - 2. Decode Payload NIM & Deteksi Log DNS.png` |
+
+---
+
+## Referensi
+
+* Yasti Aisyah Primianjani — Repositori Materi Mata Kuliah *Keamanan Jaringan* (Pertemuan 1–7): https://github.com/yastiaisyah/Network-Security-Course-Bank
+* Dokumen Resmi Lab UTS (`02-dokumen/DOKUMEN-UTS-LENGKAP.md` dan `02-dokumen/LEMBAR-PERINTAH-PER-KASUS.md`)
+* Dokumentasi Resmi Docker Engine & Docker Networking (`--internal` networks)
+* Dokumentasi OpenSSL (`openssl-enc`, `openssl-dgst`, `openssl-x509`)
+* Dokumentasi Aircrack-ng & Spesifikasi IEEE 802.11i WPA2 4-Way Handshake
+* Dokumentasi Scapy (ICMP Packet Crafting) & Dnsmasq (DNS Query Logging)
 
 ---
 *Laporan praktikum UTS Keamanan Jaringan ini disusun secara mandiri dengan eksekusi lab aktual dan verifikasi menyeluruh.*
